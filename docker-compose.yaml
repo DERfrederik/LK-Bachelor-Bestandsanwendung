@@ -1,0 +1,88 @@
+# Vor dem Publishen, müssen die Volumes noch angepasst werde, sodass sie nur von Docker verwaltet werden (Named Volumes) -> das jetzt ist nur für die Entwicklung
+version: '3.8'
+services:
+  database:
+    image: mongo:latest
+    container_name: database
+    env_file:
+      - ./.env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: $MONGO_INITDB_ROOT_USERNAME # Hier werden beim docker-compose up direkt die VAriablen einmalig gestezt, nachfolgende Ändernungen am .env haben somit keinen EInfluss -> für unbedingt statische Werte
+      MONGO_INITDB_ROOT_PASSWORD: $MONGO_INITDB_ROOT_PASSWORD
+      MONGO_INITDB_DATABASE: $MONGO_INITDB_ROOT_PASSWORD
+    restart: always
+    volumes:
+      - ./database/mongo_volume:/data/db:rw # (/data/db -> gibt image an )
+    networks:
+      # Angeben in welches Netzwerk man möchte. Hätte ich es unten weggealssen, hätte es hier auch nicht hin gemusst
+      - wetter_getter_network
+    ports:
+      - '8001:27017/tcp' #Für Compass nach außen freigeben (27017 gibt image vor)
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    networks:
+      # Angeben in welches Netzwerk man möchte. Hätte ich es unten weggealssen, hätte es hier auch nicht hin gemusst
+      - wetter_getter_network
+      - traefik-public
+    #ports:
+    #  - "8000:20000/tcp"
+    labels:
+      # Enable Traefik for this specific "backend" service (weil wir es default mäßig deaktiviert hatten))
+      - traefik.enable=true
+      # Define the port inside of the Docker service tu use 
+      - traefik.http.services.app.loadbalancer.server.port=20000
+      # Make Traefik use this domain in HTTP (entrypoint haben wir im anderen File angelegt)
+      # app-http ist dann der Name
+      # rule besagt -> Komtt vom Host eine Anfrage auf fastapi-with-traefik.tiangolo.com soll
+      # er an diesen service weitergeschickt werden (in unserem Fall backend)
+      # So könnte man verschiede Domains einem service zuordnen
+      - traefik.http.routers.app-http.entrypoints=http
+      - traefik.http.routers.app-http.rule=Host(`api.cablesalad.io/docs`)
+      # Use the traefik.docker.network=traefik-public
+    volumes:
+      - ./backend:/backend
+    env_file:
+      - ./.env
+    environment:
+      - AQIN_KEY=${AQIN_KEY} # Hier wird während der runtime aus der .env gelesen -> für dynamische Werte
+      - UmweltstationID=${UmweltstationID}
+      - MONGODB_CONN_STRING=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@${MONGO_URL}:${MONGO_PORT}
+    restart: always
+    depends_on:
+      - database
+
+  webserver:
+    image: nginx:latest
+    container_name: webserver
+    restart: always
+    #ports:
+    #  - 8002:80/tcp
+    labels:
+      # Enable Traefik for this specific "webserver" service (weil wir es default mäßig deaktiviert hatten))
+      - traefik.enable=true
+      # Define the port inside of the Docker service tu use 
+      - traefik.http.services.app.loadbalancer.server.port=80
+      # Make Traefik use this domain in HTTP (entrypoint haben wir im anderen File angelegt)
+      # app-http ist dann der Name des Routers
+      # rule besagt -> Komtt vom Host eine Anfrage auf fastapi-with-traefik.tiangolo.com soll
+      # er an diesen service weitergeschickt werden (in unserem Fall backend)
+      # So könnte man verschiede Domains einem service zuordnen
+      - traefik.http.routers.app-http.entrypoints=http
+      - traefik.http.routers.app-http.rule=Host(`cablesalad.io`)
+      # Use the traefik.docker.network=traefik-public
+    volumes:
+      - ./flutter_hello_world/build/web:/usr/share/nginx/html
+    networks:
+      - traefik-public
+
+networks:
+  #Hiermit gebe ich den genauen Namen des Netzwerks an. Eigentlich unnötig, denn der defaultName  ist <dir>_default und funktioniert. Das ist also nur zum Verständnis
+  wetter_getter_network:
+    name: my-wetter_getter_network_name
+    driver: bridge #Netzwerk treiber typ
+  traefik-public:
+    external: true

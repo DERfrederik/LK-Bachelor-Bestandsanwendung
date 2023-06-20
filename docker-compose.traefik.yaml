@@ -1,0 +1,39 @@
+services:
+  reverse_proxy:
+    # Use latest Traefik image available
+    image: traefik:latest
+    ports:
+      # Listen on port 80, default for HTTP, necessary to redirect to HTTPS
+      - 80:80
+    restart: always
+    volumes:
+      # Add Docker as a mounted Volume, so that Traefik can read the labels of other services
+      # EInfach: Das ist die Möglichkeit für Traefik mit Docker zu kommunizieren
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      # Enable Docker in Traefik, so that it reads labels from Docker services (could also be Kubernetes or similar)
+      - --providers.docker
+      # Do not expose all Docker Services, only the ones explicitly exposed
+      - --providers.docker.exposedbydefault=false
+      # Create an Entrypoint "http" listening on port 80
+      - --entrypoints.http.address=:80
+      # Enable the access log, with HTTP requests
+      - --accesslog
+      # Enable the Traefik log, for configurations and errors
+      - --log
+    networks:
+      # Use the public network created to be shared between Traefik
+      # and any other service that needs to be publicly available with HTTPS
+      - traefik-public
+
+networks:
+  # Use the previously created public network "traefik-public", shared with other
+  # services that need to be publicly available via this Traefik
+  traefik-public:
+    # This makes Docker consider the network as a global network.
+    # Normally, a network would only be accessible within the current stack / docker-compose.
+    # However, this network is now installed globally on the Docker Engine,
+    # so it can be accessed from any stack / docker-compose.
+    # Without the external:true, Docker would try to create the network itself,
+    # which it should not do.
+    external: true

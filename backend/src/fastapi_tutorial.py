@@ -5,7 +5,7 @@ from jose import jwt # Für json webtoken
 import datetime
 from enum import Enum
 
-tutorial_app = FastAPI()  
+app = FastAPI()  
 
 weather = {0: {"timestamp":  1672531261,  "temp": -5, "temp_type": "grad", "pressure": 998, "wind": 14},
 1: {"timestamp":  1675209661,  "temp": 4, "temp_type": "grad", "pressure": 1121, "wind": 20},
@@ -32,7 +32,7 @@ class ResponseWeahterItem(BaseModel): # Manchmal möchte man nicht alle Ergebnis
 
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="login") # Schema verlinkt auf Endpunkt der den Login macht oder so...
 
-@tutorial_app.post("/login") # @app.post -> path operation decorator
+@app.post("/login") # @app.post -> path operation decorator
 async def login(data: OAuth2PasswordRequestForm = Depends()): # Für Denpendency Injection
 	if data.username == "test" and data.password == "test":
 		access_token = jwt.encode({"user": data.username}, key="secret") # Token generieren -> ich glaube der username wird mit dem key "secret" verschlüsselt, ist aber anscheind nicht so sicher, keine sensible Infos in Baerer Token, können leicht decodiert werden
@@ -47,12 +47,12 @@ async def login(data: OAuth2PasswordRequestForm = Depends()): # Für Denpendency
 # async def hello(token: str = Depends(oauth2_schema)): # Dpendency injection nur dass man so noch auf den token zugreifen kann, wenn man ihn z.B decodieren möchte
 # 	return {"message": "Hello World2!"}
 
-@tutorial_app.get("/weather/", dependencies=[Depends(oauth2_schema)])  # Dependency Injection -> Endpunkt sichern so wird erst login (user und pw) ausgeführt und danach erhält er den Baerer Token mit dem er an den ENdpunkt kommt -> In der SwaggerUI muss man dann erst auf dass Schloss klicken und seine Nutzerdaten angeben
+@app.get("/weather/", dependencies=[Depends(oauth2_schema)])  # Dependency Injection -> Endpunkt sichern so wird erst login (user und pw) ausgeführt und danach erhält er den Baerer Token mit dem er an den ENdpunkt kommt -> In der SwaggerUI muss man dann erst auf dass Schloss klicken und seine Nutzerdaten angeben
 async def get_all_weather():
 	print("Hier")
 	return weather
 
-@tutorial_app.get("/weather_query/")  # Querys werden mit .de:8000/weather_query?=abdas angegben -> kann zum filtern verwendet werden z.B Nach Luftdruck unter 1000 
+@app.get("/weather_query/")  # Querys werden mit .de:8000/weather_query?=abdas angegben -> kann zum filtern verwendet werden z.B Nach Luftdruck unter 1000 
 async def get_query_weather(query: int | None = 0 ): # Hier kommt die Query hin. Durch das Optional lässt sich ein default wert setzten, sonst muss der Nutzer einen wert reinschreiben
 	if query:
 		data = []
@@ -62,21 +62,21 @@ async def get_query_weather(query: int | None = 0 ): # Hier kommt die Query hin.
 	return data
 
 
-@tutorial_app.get("/weather/{weather_set_id}")
+@app.get("/weather/{weather_set_id}")
 async def get_item(item_id: int): #Hat wirklich Datentypen, die angeben werden können, sonst string und zwar so:
 	return weather[item_id]
 
-@tutorial_app.post("/weather/", response_model=ResponseWeahterItem) # Hier wird angegeben, wie die Antwort aussehen soll (Teilmenge con WheatherItem) 
+@app.post("/weather/", response_model=ResponseWeahterItem) # Hier wird angegeben, wie die Antwort aussehen soll (Teilmenge con WheatherItem) 
 async def add_weather(data: WeatherItem):	# mit data: sagen wir, dass die erwarteten Daten genauso aussehen solloen, sonst wird ein Fehler geworfen
 	highest_id = max(weather.keys())
 	weather[highest_id+1] = data
 	return data
 
-@tutorial_app.put("/weather/{weather_set_id}")
+@app.put("/weather/{weather_set_id}")
 async def change_weather(id: int, weather_item: WeatherItem):
 	weather[id] = weather_item
 	return weather_item
 
-@tutorial_app.delete("/weather/{weather_set_id}")
+@app.delete("/weather/{weather_set_id}")
 async def delete_weather(id: int):
 	weather.pop(id, None)

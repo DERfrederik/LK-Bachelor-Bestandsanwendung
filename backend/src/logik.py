@@ -17,13 +17,14 @@ class Weather(BaseModel):
     wind: float
 
 async def weather_scraper():
+    print("start weather scraper")
     while True:
         weather = WeatherAPI.get_weather()
         current_weather = Weather(**weather)
         new_weather = await db["weather"].insert_one(current_weather.dict()) 
         created_weather = await db["weather"].find_one({"_id": ObjectId(new_weather.inserted_id)})
-        print(created_weather)
-        await asyncio.sleep(60)
+        print("Wetter created", created_weather)
+        await asyncio.sleep(3600)
 
 async def weather_scraper_main():
     await weather_scraper()

@@ -6,7 +6,10 @@ from bson import ObjectId
 import motor.motor_asyncio
 import os
 
-app = FastAPI()
+# Der root_path hängt mit dem Proxy zusammen. Dieser wird nur wegen dem Pfad /docs benötigt
+# Dieser wird nämlich unter einem anderen Pfad vermutet, da der traefik das /api abschneidet
+# Deswegen muss es hier nohcmal angegeben werden
+app = FastAPI(root_path="/api")
 
 #DB connection
 client = motor.motor_asyncio.AsyncIOMotorClient(os.environ["MONGODB_CONN_STRING"])
@@ -22,8 +25,12 @@ class WeatherItem(BaseModel):
 
 class WeatherError(BaseModel):
 	error: str
-	
-@app.get("api/weather/", response_model= WeatherItem | WeatherError)
+
+@app.get("/")
+async def root():
+    return {"message": "Hello, World!"}
+
+@app.get("/weather/", response_model= WeatherItem | WeatherError)
 async def get_weather(timestamp: int | None = None): #Hat wirklich Datentypen, die angeben werden können, sonst string und zwar so:
 	if timestamp is None:
 		datetime_weather = WeatherAPI.get_weather()
